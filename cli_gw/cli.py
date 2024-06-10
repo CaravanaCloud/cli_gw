@@ -7,7 +7,38 @@ Be creative! do whatever you want!
 - Start a web application
 - Import things from your .base module
 """
+import sys
+import docker
 
+from .logging import *
+from .containers import ContainerRun
+
+
+
+def lookup(prompt: list[str]) -> list[ContainerRun]:
+    return [ContainerRun(
+        image="cytopia/ansible:latest",
+        entrypoint="ansible --version"
+    )]
+
+def apply(client, run: ContainerRun):
+    container = client.containers.run(
+                image=run.image, 
+                entrypoint=run.entrypoint,
+                detach=True
+            )
+    for line in container.logs(stream=True):
+            line = line.decode("utf-8").strip()
+            info(line)
+    container.wait()
+    log.debug("container ended.")
+
+    return {} #TODO
+
+def apply_all(runs: list[ContainerRun]):
+    client = docker.from_env()
+    [apply(client, run) for run in runs]
+    
 
 def main():  # pragma: no cover
     """
@@ -16,13 +47,25 @@ def main():  # pragma: no cover
 
     This is your program's entry point.
 
-    You can change this function to do whatever you want.
-    Examples:
-        * Run a test suite
-        * Run a server
-        * Do some other stuff
-        * Run a command line application (Click, Typer, ArgParse)
-        * List all available tasks
-        * Run an application (Flask, FastAPI, Django, etc.)
+    1- Parse the command line
+    2- Identify the plugins to activate
+       $ rh ansible version
+       ? rh-ansible-version ?
+       ? rh-ansible ! -> (JSON vs FFI) <- plugin
+       ? rh-ansible.Containerfile !
+         [ansible --version]
+
+       $ rh openshift create cluster gitops/aws/...
+         .....
+        [build config, validate environment, deploy, post-config, verify]
+
+    3- Build execution plan
+    4- Invoke the container engine
+
+
     """
-    print("This will do something")
+    info("This will do something!!!")
+    prompt = sys.argv[1:]
+    plan = lookup(prompt)
+    apply_all(plan)
+    info(prompt)
